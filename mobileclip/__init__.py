@@ -79,7 +79,7 @@ def create_model_and_transforms(
     if reparameterize:
         model = reparameterize_model(model)
 
-    return model, None, preprocess
+    return model, model_cfg, preprocess
 
 
 def get_tokenizer(model_name: str) -> nn.Module:
