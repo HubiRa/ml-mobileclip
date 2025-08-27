@@ -209,8 +209,6 @@ class RepMixerBlock(nn.Module):
         use_layer_scale: bool = True,
         layer_scale_init_value: float = 1e-5,
         inference_mode: bool = False,
-        *args,
-        **kwargs,
     ):
         """Build RepMixer Block.
 
@@ -258,7 +256,7 @@ class RepMixerBlock(nn.Module):
                 layer_scale_init_value * torch.ones((dim, 1, 1)), requires_grad=True
             )
 
-    def forward(self, x, *args, **kwargs):
+    def forward(self, x):
         if x.dim() == 3:
             # B, C, D --- where C is the context length
             # Convert to B, D, C --- to match RepMixer impl.

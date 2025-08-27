@@ -30,8 +30,6 @@ class GlobalPool(nn.Module):
         self,
         pool_type: Optional[str] = "mean",
         keep_dim: Optional[bool] = False,
-        *args,
-        **kwargs
     ) -> None:
         super().__init__()
         if pool_type not in self.pool_types:
@@ -43,7 +41,7 @@ class GlobalPool(nn.Module):
         self.pool_type = pool_type
         self.keep_dim = keep_dim
 
-    def _global_pool(self, x: Tensor, dims: List):
+    def _global_pool(self, x: Tensor, dims: List[int]):
         if self.pool_type == "rms":  # root mean square
             x = x**2
             x = torch.mean(x, dim=dims, keepdim=self.keep_dim)
@@ -69,7 +67,7 @@ class GlobalPool(nn.Module):
 class GlobalPool2D(nn.Module):
     """This class implements global pooling with linear projection."""
 
-    def __init__(self, in_dim: int, out_dim: int, *args, **kwargs) -> None:
+    def __init__(self, in_dim: int, out_dim: int) -> None:
         super().__init__()
         scale = in_dim**-0.5
         self.pool = GlobalPool(pool_type="mean", keep_dim=False)
@@ -77,12 +75,12 @@ class GlobalPool2D(nn.Module):
         self.in_dim = in_dim
         self.out_dim = out_dim
 
-    def forward(self, x: Tensor, *args, **kwargs) -> Tensor:
+    def forward(self, x: Tensor) -> Tensor:
         # x is of shape [batch, in_dim]
-        assert (
-            x.dim() == 4
-        ), "Input should be 4-dimensional (Batch x in_dim x in_height x in_width). Got: {}".format(
-            x.shape
+        assert x.dim() == 4, (
+            "Input should be 4-dimensional (Batch x in_dim x in_height x in_width). Got: {}".format(
+                x.shape
+            )
         )
 
         # [batch, in_dim, in_height, in_width] --> [batch, in_dim]
@@ -102,11 +100,11 @@ class SimpleImageProjectionHead(nn.Module):
         self.in_dim = in_dim
         self.out_dim = out_dim
 
-    def forward(self, x: Tensor, *args, **kwargs) -> Tensor:
+    def forward(self, x: Tensor) -> Tensor:
         # x is of shape [batch, in_dim]
-        assert (
-            x.dim() == 2
-        ), "Input should be 2-dimensional (Batch x in_dim). Got: {}".format(x.shape)
+        assert x.dim() == 2, (
+            "Input should be 2-dimensional (Batch x in_dim). Got: {}".format(x.shape)
+        )
 
         # [batch, in_dim] x [in_dim, out_dim] --> [batch, out_dim]
         x = x @ self.proj

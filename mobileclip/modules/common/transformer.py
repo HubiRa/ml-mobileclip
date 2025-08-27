@@ -30,22 +30,20 @@ class LayerNormFP32(nn.LayerNorm):
         normalized_shape: Union[int, List[int], Size],
         eps: Optional[float] = 1e-5,
         elementwise_affine: Optional[bool] = True,
-        *args,
-        **kwargs,
     ):
         super().__init__(
             normalized_shape=normalized_shape,
             eps=eps,
             elementwise_affine=elementwise_affine,
-            *args,
-            **kwargs,
         )
 
     def forward(self, x: Tensor) -> Tensor:
         # Convert input from dtype X to FP32 and perform normalization operation.
         # This may help with underflow/overflow issues that we typically see with normalization layers
         inp_dtype = x.dtype
-        return super().forward(x.to(torch.float32)).to(inp_dtype)
+        x_fp32 = x.to(torch.float32)
+        normalized = F.layer_norm(x_fp32, self.normalized_shape, self.weight, self.bias, self.eps)
+        return normalized.to(inp_dtype)
 
 
 def get_normalization_layer(norm_type, num_features):
@@ -65,8 +63,6 @@ class PositionalEmbedding(nn.Module):
         padding_idx: Optional[int] = None,
         is_learnable: Optional[bool] = False,
         interpolation_mode: Optional[str] = "bilinear",
-        *args,
-        **kwargs,
     ):
         super().__init__()
         # Add other pos embedding here and logic to choose between them
@@ -77,12 +73,10 @@ class PositionalEmbedding(nn.Module):
             embedding_dim=embedding_dim,
             padding_idx=padding_idx,
             interpolation_mode=interpolation_mode,
-            *args,
-            **kwargs,
         )
 
-    def forward(self, seq_len: int, *args, **kwargs) -> Tensor:
-        return self.pos_embed(seq_len, *args, **kwargs)
+    def forward(self, seq_len: int) -> Tensor:
+        return self.pos_embed(seq_len)
 
     def __repr__(self):
         return self.pos_embed.__repr__()
@@ -97,8 +91,6 @@ class LearnablePositionalEmbedding(nn.Module):
         embedding_dim: int,
         padding_idx: Optional[int] = None,
         interpolation_mode: Optional[str] = "bilinear",
-        *args,
-        **kwargs,
     ):
         super().__init__()
         self.pos_embed = nn.Parameter(torch.empty(1, 1, num_embeddings, embedding_dim))
@@ -115,7 +107,7 @@ class LearnablePositionalEmbedding(nn.Module):
             with torch.no_grad():
                 self.pos_embed[:, :, self.padding_idx, ...] = 0.0
 
-    def forward(self, seq_len: int, *args, **kwargs) -> Tensor:
+    def forward(self, seq_len: int) -> Tensor:
         # scale pos embedding
         pos_embed = self.pos_embed
         if self.padding_idx is not None:
@@ -168,8 +160,6 @@ class MultiHeadAttention(nn.Module):
         attn_dropout: Optional[float] = 0.0,
         bias: Optional[bool] = True,
         output_dim: Optional[int] = None,
-        *args,
-        **kwargs,
     ) -> None:
         if output_dim is None:
             output_dim = embed_dim
@@ -314,8 +304,6 @@ class MultiHeadAttention(nn.Module):
         x_kv: Optional[Tensor] = None,
         key_padding_mask: Optional[Tensor] = None,
         attn_mask: Optional[Tensor] = None,
-        *args,
-        **kwargs,
     ) -> Tensor:
         # [Batch , Sequence, Hidden_dim]
         return self._forward_impl(
@@ -355,8 +343,6 @@ class TransformerEncoder(nn.Module):
         ffn_dropout: Optional[float] = 0.0,
         transformer_norm_layer: Optional[str] = "layer_norm",
         stochastic_dropout: Optional[float] = 0.0,
-        *args,
-        **kwargs,
     ) -> None:
 
         super().__init__()
@@ -427,8 +413,6 @@ class TransformerEncoder(nn.Module):
         x_prev: Optional[Tensor] = None,
         key_padding_mask: Optional[Tensor] = None,
         attn_mask: Optional[Tensor] = None,
-        *args,
-        **kwargs,
     ) -> Tensor:
 
         # Multi-head attention
@@ -439,8 +423,6 @@ class TransformerEncoder(nn.Module):
             x_kv=x_prev,
             key_padding_mask=key_padding_mask,
             attn_mask=attn_mask,
-            *args,
-            **kwargs,
         )  # mha
 
         x = self.drop_path(self.pre_norm_mha[2](x))  # applying stochastic depth

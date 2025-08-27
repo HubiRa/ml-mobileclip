@@ -9,7 +9,7 @@ from torch import Tensor, nn
 
 
 class ClipTokenizer(nn.Module):
-    def __init__(self, cfg, *args, **kwargs):
+    def __init__(self, cfg):
         super().__init__()
         self.context_length = cfg["text_cfg"]["context_length"]
         model_name = getattr(cfg["text_cfg"], "open_clip_tokenizer", "ViT-B-16")
@@ -29,7 +29,7 @@ class ClipTokenizer(nn.Module):
         # Tokenizing an empty string returns a list [sot_id, eot_id]
         return self.tokenizer("")[0]
 
-    def forward(self, input_sentence: str, *args, **kwargs) -> Tensor:
+    def forward(self, input_sentence: str) -> Tensor:
         # tokenizer returns indices as a string
         tokenized_sentence = self.tokenizer(input_sentence, self.context_length)
         assert (

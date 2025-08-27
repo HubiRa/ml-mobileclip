@@ -2,8 +2,8 @@
 # For licensing see accompanying LICENSE file.
 # Copyright (C) 2024 Apple Inc. All Rights Reserved.
 #
-from typing import Any
-
+from typing import Any, Optional
+import torch
 import torch.nn as nn
 from timm.models import create_model
 
@@ -16,11 +16,9 @@ class MCi(nn.Module):
     This class implements `MCi Models <https://arxiv.org/pdf/2311.17049.pdf>`_
     """
 
-    def __init__(self, model_name: str, *args, **kwargs) -> None:
+    def __init__(self, model_name: str, projection_dim: Optional[int] = None) -> None:
         super().__init__()
-        self.projection_dim = None
-        if "projection_dim" in kwargs:
-            self.projection_dim = kwargs.get("projection_dim")
+        self.projection_dim = projection_dim
 
         # Create model
         self.model = create_model(model_name, projection_dim=self.projection_dim)
@@ -32,7 +30,7 @@ class MCi(nn.Module):
                     image_classifier=self.model.head, projection_dim=self.projection_dim
                 )
 
-    def forward(self, x: Any, *args, **kwargs) -> Any:
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
         """A forward function of the model."""
         x = self.model(x)
         return x
@@ -60,7 +58,7 @@ class MCi(nn.Module):
 
     @staticmethod
     def _update_image_classifier(
-        image_classifier: nn.Module, projection_dim: int, *args, **kwargs
+        image_classifier: nn.Module, projection_dim: int
     ) -> nn.Module:
         in_features = MCi._get_in_feature_dimension(image_classifier)
         new_img_classifier = GlobalPool2D(in_dim=in_features, out_dim=projection_dim)

@@ -18,7 +18,7 @@ from mobileclip import logger
 
 
 class TextTransformer(nn.Module):
-    def __init__(self, cfg: dict, projection_dim: int, *args, **kwargs) -> None:
+    def __init__(self, cfg: dict, projection_dim: int) -> None:
         super().__init__()
 
         model_dim = cfg["dim"]
@@ -38,9 +38,9 @@ class TextTransformer(nn.Module):
 
         # Context length
         context_length = cfg["context_length"]
-        assert (
-            context_length is not None
-        ), "Context length can't be None. Please set value accordingly."
+        assert context_length is not None, (
+            "Context length can't be None. Please set value accordingly."
+        )
 
         self.positional_embedding = (
             None
@@ -176,8 +176,6 @@ class TextTransformer(nn.Module):
         text_tokens: Tensor,
         key_padding_mask: Optional[Tensor] = None,
         return_all_tokens: bool = False,
-        *args,
-        **kwargs
     ) -> Tensor:
         """Return text token embeddings.
 
@@ -196,7 +194,7 @@ class TextTransformer(nn.Module):
         token_emb = self.forward_embedding(text_tokens)
 
         # [1, context_length, context_length]
-        attn_mask = None
+        attn_mask: Optional[Tensor] = None
         if self.causal_masking:
             attn_mask = self.build_attention_mask(
                 context_length=text_tokens.shape[1], batch_size=text_tokens.shape[0]
@@ -205,11 +203,16 @@ class TextTransformer(nn.Module):
             key_padding_mask = None
 
         for layer in self.transformer:
-            token_emb = layer(
-                token_emb,
-                key_padding_mask=key_padding_mask,
-                attn_mask=attn_mask,
-            )
+            if hasattr(layer, 'token_mixer') and hasattr(layer, 'convffn'):
+                # This is a RepMixerBlock
+                token_emb = layer(token_emb)
+            else:
+                # This is a TransformerEncoder
+                token_emb = layer(
+                    token_emb,
+                    key_padding_mask=key_padding_mask,
+                    attn_mask=attn_mask,
+                )
 
         # Apply layer norm
         token_emb = self.final_layer_norm(token_emb)
@@ -230,16 +233,12 @@ class TextTransformer(nn.Module):
         text_tokens: Tensor,
         key_padding_mask: Optional[Tensor] = None,
         return_all_tokens: bool = False,
-        *args,
-        **kwargs
     ) -> Tensor:
         # Image-text pair data with single caption
         # [B, CL] --> [B, d]
         text_tokens = self.encode_text(
-            text_tokens=text_tokens,
-            key_padding_mask=key_padding_mask,
-            return_all_tokens=return_all_tokens,
-            *args,
-            **kwargs
+            text_tokens,
+            key_padding_mask,
+            return_all_tokens,
         )
         return text_tokens

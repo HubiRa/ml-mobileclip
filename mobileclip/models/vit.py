@@ -81,8 +81,6 @@ class ConvNormAct(nn.Module):
         use_act: bool = True,
         norm_layer: Optional[nn.Module] = None,
         act_layer: Optional[nn.Module] = None,
-        *args,
-        **kwargs,
     ) -> None:
         super().__init__()
         self.ndim = 2
@@ -115,9 +113,9 @@ class ConvNormAct(nn.Module):
             and any(param[0] == "bias" for param in norm_layer.named_parameters())
             and bias
         ):
-            assert (
-                not bias
-            ), "Do not use bias when using normalization layers with bias."
+            assert not bias, (
+                "Do not use bias when using normalization layers with bias."
+            )
 
         if isinstance(kernel_size, int):
             kernel_size = (kernel_size,) * self.ndim
@@ -202,14 +200,12 @@ class VisionTransformer(nn.Module):
         4. We do not add positional encoding to class token (if enabled), as suggested in `DeiT-3 paper <https://arxiv.org/abs/2204.07118>`_
     """
 
-    def __init__(self, cfg, *args, **kwargs) -> None:
+    def __init__(self, cfg, projection_dim: Optional[int] = None) -> None:
         super().__init__()
         image_channels = 3
         num_classes = cfg.get("n_classes", 1000)
 
-        self.projection_dim = None
-        if "projection_dim" in kwargs:
-            self.projection_dim = kwargs.get("projection_dim")
+        self.projection_dim = projection_dim
 
         kernel_sizes_conv_stem = [4, 2, 2]
         strides_conv_stem = [4, 2, 2]
@@ -342,7 +338,7 @@ class VisionTransformer(nn.Module):
         return patch_emb, (n_h, n_w)
 
     def _features_from_transformer(
-        self, x: Tensor, *args, **kwargs
+        self, x: Tensor
     ) -> Tuple[Tensor, Tuple[int, int]]:
         # this function extract patch embeddings and then apply transformer module to learn
         # inter-patch representations
@@ -358,11 +354,12 @@ class VisionTransformer(nn.Module):
         return x, (n_h, n_w)
 
     def extract_features(
-        self, x: Tensor, *args, **kwargs
+        self,
+        x: Tensor,
+        return_image_embeddings: bool = False,
     ) -> Tuple[Tensor, Optional[Tensor]]:
         # The extract_features function for ViT returns two outputs: (1) embedding corresponding to CLS token
         # and (2) image embeddings of the shape [B, C, h//o, w//o], where the value of o is typically 16.
-        return_image_embeddings = kwargs.get("return_image_embeddings", False)
 
         # [B, C, H, W] --> [B, N + 1, embed_dim] or [B, N, embed_dim]
         # here, B is batch size, C is input channels
@@ -370,7 +367,7 @@ class VisionTransformer(nn.Module):
         # N is the number of pixels (or tokens) after processing input with conv stem and reshaping
         # We add +1 for cls token (if applicable)
         # embed_dim --> embedding dimension
-        x, (n_h, n_w) = self._features_from_transformer(x, *args, **kwargs)
+        x, (n_h, n_w) = self._features_from_transformer(x)
 
         if self.cls_token is not None:
             # [B, N + 1, embed_dim] --> [B, embed_dim], [B, N, embed_dim]
@@ -396,29 +393,29 @@ class VisionTransformer(nn.Module):
         else:
             return cls_embedding, None
 
-    def forward_classifier(self, x: Tensor, *args, **kwargs) -> Tuple[Tensor, Tensor]:
-        cls_embedding, image_embedding = self.extract_features(x, *args, **kwargs)
+    def forward_classifier(self, x: Tensor, return_image_embeddings: bool = False) -> Tuple[Tensor, Tensor]:
+        cls_embedding, image_embedding = self.extract_features(x, return_image_embeddings=return_image_embeddings)
         # classify based on CLS token
         cls_embedding = self.classifier(cls_embedding)
         return cls_embedding, image_embedding
 
-    def forward(self, x: Tensor, *args, **kwargs) -> Union[Tensor, Dict[str, Tensor]]:
+    def forward(self, x: Tensor, return_image_embeddings: bool = False) -> Union[Tensor, Dict[str, Tensor]]:
         # In ViT model, we can return either classifier embeddings (logits) or image embeddings or both.
         # To return the image embeddings, we need to set keyword argument (return_image_embeddings) as True.
-        if kwargs.get("return_image_embeddings", False):
+        if return_image_embeddings:
             out_dict = dict()
-            prediction, image_embedding = self.forward_classifier(x, *args, **kwargs)
+            prediction, image_embedding = self.forward_classifier(x, return_image_embeddings=return_image_embeddings)
             out_dict.update({"logits": prediction})
             if image_embedding is not None:
                 out_dict.update({"image_embeddings": image_embedding})
             return out_dict
         else:
-            prediction, _ = self.forward_classifier(x, *args, **kwargs)
+            prediction, _ = self.forward_classifier(x, return_image_embeddings=False)
             return prediction
 
 
 @register_model
-def vit_b16(pretrained=False, **kwargs):
+def vit_b16(pretrained=False, projection_dim=None):
     # Vision transformer config
     cfg = {
         "norm_layer": "layer_norm_fp32",
@@ -427,7 +424,7 @@ def vit_b16(pretrained=False, **kwargs):
         "n_transformer_layers": 12,
         "n_attn_heads": 12,
     }
-    model = VisionTransformer(cfg=cfg, **kwargs)
+    model = VisionTransformer(cfg=cfg, projection_dim=projection_dim)
     if pretrained:
         raise ValueError("Functionality not implemented.")
     return model

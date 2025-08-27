@@ -163,12 +163,12 @@ class MobileOneBlock(nn.Module):
 
         # Multi-branched train-time forward pass.
         # Skip branch output
-        identity_out = 0
+        identity_out = torch.zeros_like(x)
         if self.rbr_skip is not None:
             identity_out = self.rbr_skip(x)
 
         # Scale branch output
-        scale_out = 0
+        scale_out = torch.zeros_like(x)
         if self.rbr_scale is not None:
             scale_out = self.rbr_scale(x)
 
@@ -205,10 +205,18 @@ class MobileOneBlock(nn.Module):
         # Delete un-used branches
         for para in self.parameters():
             para.detach_()
-        self.__delattr__("rbr_conv")
-        self.__delattr__("rbr_scale")
+
+        # NOTE: (hubert) this seems to be the only place where it is checked via hasattr
+        #                so there seems to be no need for __delattr__
+        #                (it seems there are even checks for is None)
+
+        # self.__delattr__("rbr_conv")
+        self.rbr_conv = None
+        # self.__delattr__("rbr_scale")
+        self.rbr_scale = None
         if hasattr(self, "rbr_skip"):
-            self.__delattr__("rbr_skip")
+            # self.__delattr__("rbr_skip")
+            self.rbr_skip = None
 
         self.inference_mode = True
 
